@@ -3,6 +3,7 @@
 
 import dbus
 import gobject
+from time import sleep
 from dbus.mainloop.glib import DBusGMainLoop
 from dbus.exceptions import DBusException
 
@@ -32,7 +33,6 @@ class SpotifyNotifier(object):
 			self.muted = False
 		else:
 			self.muted = True
-	
 
 	def props_changed_listener(self):
 		'''Hook up callback to PropertiesChanged event.'''
@@ -59,6 +59,8 @@ class SpotifyNotifier(object):
 					self.toggleMute()
 			else:
 				if self.muted:
+					# last track was an add, sleep one second, than unmute
+					sleep(1)
 					self.toggleMute()
 
 if __name__ == "__main__":
