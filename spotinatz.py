@@ -25,7 +25,10 @@ class SpotifyNotifier(object):
 		self.session_bus = self.bus.get_object('org.freedesktop.DBus', '/org/freedesktop/DBus')
 		self.session_bus.connect_to_signal('NameOwnerChanged', self.handle_name_owner_changed, arg0='org.mpris.MediaPlayer2.spotify')
 
-		loop.run()
+		try:
+			loop.run()
+		except KeyboardInterrupt:
+			print 'You will hear your ad\'s again - good bye!'
 
 	def toggleMute(self):
 		self.kmix.get_dbus_method('trigger', 'org.qtproject.Qt.QAction')()
