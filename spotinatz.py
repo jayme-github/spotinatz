@@ -52,8 +52,7 @@ class SpotifyNotifier(object):
 		'''Handle track changes.'''
 		metadata = changed_props.get("Metadata", {})
 		if metadata:
-			# print metadata
-			album = unicode(metadata.get("xesam:album").encode("latin1"))
+			album = metadata.get("xesam:album") #dbus.String is a subtype of unicode
 			print album
 			if album.startswith('spotify') or 'http' in album:
 				if not self.muted:
