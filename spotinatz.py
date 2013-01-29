@@ -12,8 +12,8 @@ class SpotifyNotifier(object):
 	def __init__(self):
 		bus_loop = DBusGMainLoop(set_as_default=True)
 		self.bus = dbus.SessionBus(mainloop=bus_loop)
-		self.kmix = self.bus.get_object('org.kde.kmix', '/kmix/KMixWindow/actions/mute')
-		self.muted = False
+		self._dbus_mixer_prop = None
+		self._dbus_toggleMute = None
 		loop = gobject.MainLoop()
 
 		try: 
@@ -24,18 +24,32 @@ class SpotifyNotifier(object):
 				raise
 		self.session_bus = self.bus.get_object('org.freedesktop.DBus', '/org/freedesktop/DBus')
 		self.session_bus.connect_to_signal('NameOwnerChanged', self.handle_name_owner_changed, arg0='org.mpris.MediaPlayer2.spotify')
+		self._dbug_find_spotify_control()
 
 		try:
 			loop.run()
 		except KeyboardInterrupt:
 			print 'You will hear your ad\'s again - good bye!'
 
+	def isMuted(self):
+		return self._dbus_mixer_prop.Get('', 'mute')
+
 	def toggleMute(self):
-		self.kmix.get_dbus_method('trigger', 'org.qtproject.Qt.QAction')()
-		if self.muted:
-			self.muted = False
-		else:
-			self.muted = True
+		self._dbus_toggleMute()
+
+	def dbus_get_kmix_property(self, obj_path, prop):
+		return self.bus.get_object('org.kde.kmix', obj_path).Get('', prop, dbus_interface='org.freedesktop.DBus.Properties')
+
+	def _dbug_find_spotify_control(self):
+		'''find the spotify control in kmix'''
+		for mixer in self.dbus_get_kmix_property('/Mixers', 'mixers'):
+			for control in self.dbus_get_kmix_property(mixer, 'controls'):
+				if 'spotify' in self.dbus_get_kmix_property(control, 'readableName').lower():
+					print 'found control: "%s"' % control
+					self._dbus_toggleMute = self.bus.get_object('org.kde.kmix', control).get_dbus_method('toggleMute', 'org.kde.KMix.Control')
+					self._dbus_mixer_prop = dbus.Interface(self.bus.get_object('org.kde.kmix', control), dbus_interface='org.freedesktop.DBus.Properties')
+					return
+		print 'ERROR: spotify control not found in kmix...'
 
 	def props_changed_listener(self):
 		'''Hook up callback to PropertiesChanged event.'''
@@ -55,13 +69,14 @@ class SpotifyNotifier(object):
 		'''Handle track changes.'''
 		metadata = changed_props.get("Metadata", {})
 		if metadata:
-			album = metadata.get("xesam:album") #dbus.String is a subtype of unicode
-			print album
+			album = metadata.get("xesam:album").lower() #dbus.String is a subtype of unicode
 			if album.startswith('spotify') or 'http' in album:
-				if not self.muted:
+				print 'Possible ad: "%s"' % album
+				if not self.isMuted():
 					self.toggleMute()
 			else:
-				if self.muted:
+				print 'Not an ad: "%s"' % album
+				if self.isMuted():
 					# last track was an add, sleep one second, than unmute
 					sleep(1)
 					self.toggleMute()
